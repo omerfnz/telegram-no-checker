@@ -6,6 +6,7 @@ This module contains the automatic number generation interface.
 
 import flet as ft
 from typing import Optional, Dict, Any
+from datetime import datetime
 from ..theme_manager import ThemeManager
 from ..widgets import ModernButton, ModernCard, ModernInput
 
@@ -21,16 +22,18 @@ class NumberGeneratorPanel:
     - Generated numbers display
     """
 
-    def __init__(self, theme_manager: ThemeManager, core_modules: Dict[str, Any]):
+    def __init__(self, theme_manager: ThemeManager, core_modules: Dict[str, Any], snackbar_manager = None):
         """
         Initialize the number generator panel.
         
         Args:
             theme_manager: Theme manager instance
             core_modules: Core modules dictionary
+            snackbar_manager: Snackbar manager instance
         """
         self.theme_manager = theme_manager
         self.core_modules = core_modules
+        self.snackbar_manager = snackbar_manager
         self.number_generator = core_modules.get('number_generator')
         
         # UI components
@@ -339,12 +342,17 @@ class NumberGeneratorPanel:
         """Handle number generation."""
         try:
             if not self.selected_operators:
-                print("Please select at least one operator")
+                if self.snackbar_manager:
+                    self.snackbar_manager.show_warning("Please select at least one operator")
                 return
 
             count = int(self.count_input.value or 1000)
             
             if self.number_generator:
+                # Show progress
+                if self.snackbar_manager:
+                    self.snackbar_manager.show_info(f"Generating {count} numbers...")
+                
                 self.generated_numbers = self.number_generator.generate_numbers_bulk(
                     country_code=self.selected_country,
                     operators=self.selected_operators,
@@ -352,10 +360,16 @@ class NumberGeneratorPanel:
                 )
                 
                 self._update_numbers_list()
-                print(f"Generated {len(self.generated_numbers)} numbers")
+                
+                # Show success
+                if self.snackbar_manager:
+                    self.snackbar_manager.show_success(f"Generated {len(self.generated_numbers)} numbers")
             
         except Exception as e:
-            print(f"Error generating numbers: {e}")
+            if self.snackbar_manager:
+                self.snackbar_manager.show_error(f"Error generating numbers: {str(e)}")
+            else:
+                print(f"Error generating numbers: {e}")
 
     def _update_numbers_list(self):
         """Update the numbers list display."""
@@ -411,16 +425,45 @@ class NumberGeneratorPanel:
 
     def _on_export_numbers(self, e):
         """Handle number export."""
-        if not self.generated_numbers:
-            print("No numbers to export")
-            return
-        
-        # TODO: Implement export functionality
-        print(f"Exporting {len(self.generated_numbers)} numbers")
+        self._export_numbers_to_excel()
+    
+    def _export_numbers_to_excel(self):
+        """Export generated numbers to Excel file."""
+        try:
+            if not self.generated_numbers:
+                if self.snackbar_manager:
+                    self.snackbar_manager.show_warning("No numbers to export")
+                return
+            
+            # Get file handler
+            file_handler = self.core_modules.get('file_handler')
+            if not file_handler:
+                if self.snackbar_manager:
+                    self.snackbar_manager.show_error("File handler not available")
+                return
+            
+            # Export to Excel
+            filename = f"generated_numbers_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+            success = file_handler.export_number_records_to_excel(self.generated_numbers, filename)
+            
+            if success:
+                if self.snackbar_manager:
+                    self.snackbar_manager.show_success(f"Numbers exported to {filename}")
+            else:
+                if self.snackbar_manager:
+                    self.snackbar_manager.show_error("Failed to export numbers")
+                    
+        except Exception as e:
+            if self.snackbar_manager:
+                self.snackbar_manager.show_error(f"Export error: {str(e)}")
 
     def get_content(self) -> ft.Control:
         """Get the panel content."""
         return self.content
+    
+    def set_page(self, page: ft.Page):
+        """Set page reference."""
+        self.page = page
     
     def rebuild_with_theme(self):
         """Rebuild UI with current theme."""

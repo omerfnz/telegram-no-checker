@@ -617,41 +617,6 @@ class ModernModal(ft.AlertDialog):
         self.elevation = 24
 
 
-class ModernToast(ft.SnackBar):
-    """Modern toast notification with Shadcn-inspired design."""
-    
-    def __init__(
-        self,
-        content: ft.Control,
-        action: Optional[str] = None,
-        action_color: Optional[str] = None,
-        duration: Optional[int] = None,
-        theme_manager: Optional[ThemeManager] = None,
-        **kwargs
-    ):
-        super().__init__(**kwargs)
-        
-        self.content = content
-        self.action = action
-        self.action_color = action_color
-        self.duration = duration
-        self.theme_manager = theme_manager
-        
-        self._setup_toast()
-    
-    def _setup_toast(self):
-        """Setup toast styling."""
-        # Base properties
-        self.content = self.content
-        self.action = self.action
-        self.action_color = self.action_color or "#2563eb"  # Blue 600
-        self.duration = self.duration or 4000
-        
-        # Modern styling
-        self.bgcolor = "#111827"  # Grey 900
-        self.elevation = 8
-
-
 class ModernBadge(ft.Container):
     """Modern badge with Shadcn-inspired design."""
     

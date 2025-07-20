@@ -6,6 +6,7 @@ This module contains the contact management interface with modern design.
 
 import flet as ft
 from typing import Optional, Dict, Any
+from datetime import datetime
 from ..theme_manager import ThemeManager
 from ..widgets import ModernButton, ModernCard, ModernInput
 
@@ -21,16 +22,18 @@ class ContactPanel:
     - Bulk import/export
     """
 
-    def __init__(self, theme_manager: ThemeManager, core_modules: Dict[str, Any]):
+    def __init__(self, theme_manager: ThemeManager, core_modules: Dict[str, Any], snackbar_manager = None):
         """
         Initialize the contact panel.
         
         Args:
             theme_manager: Theme manager instance
             core_modules: Core modules dictionary
+            snackbar_manager: Snackbar manager instance
         """
         self.theme_manager = theme_manager
         self.core_modules = core_modules
+        self.snackbar_manager = snackbar_manager
         self.contact_manager = core_modules.get('contact_manager')
         
         # UI components
@@ -383,8 +386,125 @@ class ContactPanel:
 
     def _on_add_contact(self, e):
         """Handle add contact button click."""
-        # TODO: Implement add contact dialog
-        print("Add contact clicked")
+        self._show_add_contact_dialog()
+    
+    def _show_add_contact_dialog(self):
+        """Show add contact dialog."""
+        # Form fields
+        name_input = ModernInput(
+            hint_text="Contact Name",
+            theme_manager=self.theme_manager
+        )
+        
+        phone_input = ModernInput(
+            hint_text="Phone Number (+90xxxxxxxxxx)",
+            theme_manager=self.theme_manager
+        )
+        
+        notes_input = ModernInput(
+            hint_text="Notes (optional)",
+            theme_manager=self.theme_manager,
+            multiline=True,
+            min_lines=2,
+            max_lines=4
+        )
+        
+        # Form content
+        form_content = ft.Column(
+            [
+                name_input,
+                phone_input,
+                notes_input
+            ],
+            spacing=16
+        )
+        
+        # Actions
+        actions = [
+            ft.TextButton("Cancel", on_click=self._close_dialog),
+            ft.TextButton("Add", on_click=lambda e: self._save_contact(name_input, phone_input, notes_input))
+        ]
+        
+        # Show dialog
+        self._show_dialog("Add Contact", form_content, actions)
+    
+    def _save_contact(self, name_input, phone_input, notes_input):
+        """Save new contact."""
+        try:
+            name = name_input.value.strip()
+            phone = phone_input.value.strip()
+            notes = notes_input.value.strip()
+            
+            # Validation
+            if not name:
+                if self.snackbar_manager:
+                    self.snackbar_manager.show_error("Name is required")
+                return
+            
+            if not phone:
+                if self.snackbar_manager:
+                    self.snackbar_manager.show_error("Phone number is required")
+                return
+            
+            # Create contact
+            from data.models import Contact
+            contact = Contact(
+                name=name,
+                phone_number=phone,
+                notes=notes
+            )
+            
+            # Save to database
+            if self.contact_manager:
+                contact_id = self.contact_manager.create_contact(contact)
+                contact.id = contact_id
+                
+                # Add to list
+                self.contacts.append(contact)
+                self.filtered_contacts = self.contacts.copy()
+                self._update_contact_list()
+                self._update_stats()
+                
+                # Show success message
+                if self.snackbar_manager:
+                    self.snackbar_manager.show_success(f"Contact '{name}' added successfully")
+                
+                # Close dialog
+                self._close_dialog()
+            
+        except Exception as e:
+            if self.snackbar_manager:
+                self.snackbar_manager.show_error(f"Error adding contact: {str(e)}")
+    
+    def _show_dialog(self, title: str, content: ft.Control, actions: list):
+        """Show a dialog."""
+        dialog = ft.AlertDialog(
+            title=ft.Text(title),
+            content=content,
+            actions=actions
+        )
+        
+        # Store dialog reference
+        self.current_dialog = dialog
+        
+        # Show dialog
+        if hasattr(self, 'page') and self.page:
+            self.page.dialog = dialog
+            self.page.dialog.open = True
+            self.page.update()
+        else:
+            # Fallback - just show snackbar
+            if self.snackbar_manager:
+                self.snackbar_manager.show_info("Dialog feature not available")
+    
+    def _close_dialog(self, e=None):
+        """Close current dialog."""
+        if hasattr(self, 'current_dialog') and self.current_dialog:
+            self.current_dialog.open = False
+            if hasattr(self, 'page') and self.page:
+                self.page.update()
+            # Clear dialog reference
+            self.current_dialog = None
 
     def _on_edit_contact(self, contact):
         """Handle edit contact."""
@@ -403,12 +523,45 @@ class ContactPanel:
 
     def _on_export_contacts(self, e):
         """Handle export contacts."""
-        # TODO: Implement export dialog
-        print("Export contacts clicked")
+        self._export_contacts_to_excel()
+    
+    def _export_contacts_to_excel(self):
+        """Export contacts to Excel file."""
+        try:
+            if not self.contacts:
+                if self.snackbar_manager:
+                    self.snackbar_manager.show_warning("No contacts to export")
+                return
+            
+            # Get file handler
+            file_handler = self.core_modules.get('file_handler')
+            if not file_handler:
+                if self.snackbar_manager:
+                    self.snackbar_manager.show_error("File handler not available")
+                return
+            
+            # Export to Excel
+            filename = f"contacts_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+            success = file_handler.export_contacts_to_excel(self.contacts, filename)
+            
+            if success:
+                if self.snackbar_manager:
+                    self.snackbar_manager.show_success(f"Contacts exported to {filename}")
+            else:
+                if self.snackbar_manager:
+                    self.snackbar_manager.show_error("Failed to export contacts")
+                    
+        except Exception as e:
+            if self.snackbar_manager:
+                self.snackbar_manager.show_error(f"Export error: {str(e)}")
 
     def get_content(self) -> ft.Control:
         """Get the panel content."""
         return self.content
+    
+    def set_page(self, page: ft.Page):
+        """Set page reference."""
+        self.page = page
     
     def rebuild_with_theme(self):
         """Rebuild UI with current theme."""

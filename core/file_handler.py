@@ -9,6 +9,7 @@ import pandas as pd
 from typing import List, Dict, Any, Optional, Union
 from pathlib import Path
 import logging
+from datetime import datetime
 
 logger = logging.getLogger("file_handler")
 logger.setLevel(logging.INFO)
@@ -255,4 +256,102 @@ class FileHandler:
             
         except Exception as e:
             logger.error(f"Dosya bilgisi alma hatası: {e}")
-            return {'exists': False, 'error': str(e)} 
+            return {'exists': False, 'error': str(e)}
+    
+    def export_contacts_to_excel(self, contacts: List, output_path: str) -> bool:
+        """
+        Contact listesini Excel dosyasına export eder.
+        
+        Args:
+            contacts: Contact listesi
+            output_path: Çıktı dosyasının yolu
+            
+        Returns:
+            bool: Başarılı ise True
+        """
+        try:
+            if not contacts:
+                logger.warning("Export edilecek contact bulunamadı.")
+                return False
+            
+            # Contact verilerini DataFrame'e dönüştür
+            contact_data = []
+            for contact in contacts:
+                contact_data.append({
+                    'ID': contact.id,
+                    'Name': contact.name,
+                    'Phone Number': contact.phone_number,
+                    'Is Valid': contact.is_valid,
+                    'Last Checked': contact.last_checked.isoformat() if contact.last_checked else '',
+                    'Notes': contact.notes,
+                    'Created At': contact.created_at.isoformat(),
+                    'Updated At': contact.updated_at.isoformat()
+                })
+            
+            # DataFrame oluştur
+            df = pd.DataFrame(contact_data)
+            
+            # Dosyayı kaydet
+            df.to_excel(output_path, index=False, engine='openpyxl')
+            
+            logger.info(f"Contacts başarıyla export edildi: {output_path}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Contact export hatası: {e}")
+            return False
+    
+    def export_number_records_to_excel(self, number_records: List, output_path: str) -> bool:
+        """
+        Number record listesini Excel dosyasına export eder.
+        
+        Args:
+            number_records: Number record listesi veya string listesi
+            output_path: Çıktı dosyasının yolu
+            
+        Returns:
+            bool: Başarılı ise True
+        """
+        try:
+            if not number_records:
+                logger.warning("Export edilecek number record bulunamadı.")
+                return False
+            
+            # Number record verilerini DataFrame'e dönüştür
+            record_data = []
+            for record in number_records:
+                if isinstance(record, str):
+                    # String ise basit format
+                    record_data.append({
+                        'Phone Number': record,
+                        'Generated At': datetime.now().isoformat()
+                    })
+                else:
+                    # NumberRecord objesi ise detaylı format
+                    record_data.append({
+                        'ID': record.id,
+                        'Country Code': record.country_code,
+                        'Operator Prefix': record.operator_prefix,
+                        'Phone Number': record.phone_number,
+                        'Full Number': record.full_number,
+                        'Is Valid': record.is_valid,
+                        'Is Checked': record.is_checked,
+                        'Check Date': record.check_date.isoformat() if record.check_date else '',
+                        'Check Count': record.check_count,
+                        'Notes': record.notes,
+                        'Created At': record.created_at.isoformat(),
+                        'Updated At': record.updated_at.isoformat()
+                    })
+            
+            # DataFrame oluştur
+            df = pd.DataFrame(record_data)
+            
+            # Dosyayı kaydet
+            df.to_excel(output_path, index=False, engine='openpyxl')
+            
+            logger.info(f"Number records başarıyla export edildi: {output_path}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Number record export hatası: {e}")
+            return False 

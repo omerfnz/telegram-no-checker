@@ -6,6 +6,7 @@ This module contains the number checking interface.
 
 import flet as ft
 from typing import Optional, Dict, Any
+from datetime import datetime
 from ..theme_manager import ThemeManager
 from ..widgets import ModernButton, ModernCard, ModernInput
 
@@ -21,16 +22,18 @@ class NumberCheckerPanel:
     - Results display
     """
 
-    def __init__(self, theme_manager: ThemeManager, core_modules: Dict[str, Any]):
+    def __init__(self, theme_manager: ThemeManager, core_modules: Dict[str, Any], snackbar_manager = None):
         """
         Initialize the number checker panel.
         
         Args:
             theme_manager: Theme manager instance
             core_modules: Core modules dictionary
+            snackbar_manager: Snackbar manager instance
         """
         self.theme_manager = theme_manager
         self.core_modules = core_modules
+        self.snackbar_manager = snackbar_manager
         self.file_handler = core_modules.get('file_handler')
         self.telegram_client = core_modules.get('telegram_client')
         
@@ -107,6 +110,9 @@ class NumberCheckerPanel:
         self.file_picker = ft.FilePicker(
             on_result=self._on_file_selected
         )
+        # File picker'ı page'e ekle
+        if hasattr(self, 'page') and self.page:
+            self.page.overlay.append(self.file_picker)
 
         # Selected file text
         self.selected_file_text = ft.Text(
@@ -288,7 +294,9 @@ class NumberCheckerPanel:
             # Load numbers from file
             self._load_numbers_from_file()
             
-            self.page.update()
+            # Update UI
+            if hasattr(self, 'page') and self.page:
+                self.page.update()
 
     def _load_numbers_from_file(self):
         """Load numbers from selected file."""
@@ -304,24 +312,45 @@ class NumberCheckerPanel:
                 )
                 
                 self.progress_text.value = f"Loaded {len(self.numbers_to_check)} numbers"
-                self.page.update()
+                
+                # Show success message
+                if self.snackbar_manager:
+                    self.snackbar_manager.show_success(f"Loaded {len(self.numbers_to_check)} numbers from file")
+                
+                # Update UI
+                if hasattr(self, 'page') and self.page:
+                    self.page.update()
                 
         except Exception as e:
-            print(f"Error loading file: {e}")
-            self.progress_text.value = f"Error loading file: {e}"
-            self.page.update()
+            error_msg = f"Error loading file: {e}"
+            if self.snackbar_manager:
+                self.snackbar_manager.show_error(error_msg)
+            else:
+                print(error_msg)
+            
+            self.progress_text.value = error_msg
+            if hasattr(self, 'page') and self.page:
+                self.page.update()
 
     def _on_start_checking(self, e):
         """Handle start checking button click."""
         if not self.numbers_to_check:
-            print("No numbers to check")
+            if self.snackbar_manager:
+                self.snackbar_manager.show_warning("No numbers to check")
             return
         
         self.is_checking = True
         self.check_button.disabled = True
         self.check_button.text = "Checking..."
         self.progress_text.value = "Starting check..."
-        self.page.update()
+        
+        # Show progress
+        if self.snackbar_manager:
+            self.snackbar_manager.show_info(f"Starting to check {len(self.numbers_to_check)} numbers...")
+        
+        # Update UI
+        if hasattr(self, 'page') and self.page:
+            self.page.update()
         
         # Start checking process (simplified for now)
         self._check_numbers()
@@ -348,22 +377,38 @@ class NumberCheckerPanel:
                 progress = (i + 1) / total
                 self.progress_bar.value = progress
                 self.progress_text.value = f"Checking {i + 1}/{total} numbers..."
-                self.page.update()
+                
+                # Update UI every 10 numbers
+                if i % 10 == 0:
+                    if hasattr(self, 'page') and self.page:
+                        self.page.update()
             
             # Update UI
             self.is_checking = False
             self.check_button.disabled = False
             self.check_button.text = "Start Checking"
-            self.progress_text.value = f"Completed! {len([r for r in self.check_results if r['is_valid']])} valid numbers found"
+            valid_count = len([r for r in self.check_results if r['is_valid']])
+            self.progress_text.value = f"Completed! {valid_count} valid numbers found"
             self._update_results_list()
             
+            # Show completion message
+            if self.snackbar_manager:
+                self.snackbar_manager.show_success(f"Check completed! {valid_count} valid numbers found")
+            
         except Exception as e:
-            print(f"Error checking numbers: {e}")
+            error_msg = f"Error checking numbers: {e}"
+            if self.snackbar_manager:
+                self.snackbar_manager.show_error(error_msg)
+            else:
+                print(error_msg)
+            
             self.is_checking = False
             self.check_button.disabled = False
             self.check_button.text = "Start Checking"
             self.progress_text.value = f"Error: {e}"
-            self.page.update()
+            
+            if hasattr(self, 'page') and self.page:
+                self.page.update()
 
     def _update_results_list(self):
         """Update the results list display."""
@@ -437,16 +482,53 @@ class NumberCheckerPanel:
 
     def _on_export_results(self, e):
         """Handle results export."""
-        if not self.check_results:
-            print("No results to export")
-            return
-        
-        # TODO: Implement export functionality
-        print(f"Exporting {len(self.check_results)} results")
+        self._export_results_to_excel()
+    
+    def _export_results_to_excel(self):
+        """Export check results to Excel file."""
+        try:
+            if not self.check_results:
+                if self.snackbar_manager:
+                    self.snackbar_manager.show_warning("No results to export")
+                return
+            
+            # Get file handler
+            file_handler = self.core_modules.get('file_handler')
+            if not file_handler:
+                if self.snackbar_manager:
+                    self.snackbar_manager.show_error("File handler not available")
+                return
+            
+            # Export to Excel
+            filename = f"check_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+            try:
+                file_handler.save_results_to_excel(self.check_results, filename)
+                success = True
+            except Exception as e:
+                success = False
+                print(f"Export error: {e}")
+            
+            if success:
+                if self.snackbar_manager:
+                    self.snackbar_manager.show_success(f"Results exported to {filename}")
+            else:
+                if self.snackbar_manager:
+                    self.snackbar_manager.show_error("Failed to export results")
+                    
+        except Exception as e:
+            if self.snackbar_manager:
+                self.snackbar_manager.show_error(f"Export error: {str(e)}")
 
     def get_content(self) -> ft.Control:
         """Get the panel content."""
         return self.content
+    
+    def set_page(self, page: ft.Page):
+        """Set page reference."""
+        self.page = page
+        # File picker'ı page'e ekle
+        if self.file_picker and self.file_picker not in page.overlay:
+            page.overlay.append(self.file_picker)
     
     def rebuild_with_theme(self):
         """Rebuild UI with current theme."""

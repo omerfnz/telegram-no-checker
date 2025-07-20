@@ -21,16 +21,18 @@ class SettingsPanel:
     - Application preferences
     """
 
-    def __init__(self, theme_manager: ThemeManager, core_modules: Dict[str, Any]):
+    def __init__(self, theme_manager: ThemeManager, core_modules: Dict[str, Any], snackbar_manager = None):
         """
         Initialize the settings panel.
         
         Args:
             theme_manager: Theme manager instance
             core_modules: Core modules dictionary
+            snackbar_manager: Snackbar manager instance
         """
         self.theme_manager = theme_manager
         self.core_modules = core_modules
+        self.snackbar_manager = snackbar_manager
         
         # UI components
         self.api_id_input = None
@@ -332,35 +334,117 @@ class SettingsPanel:
         api_hash = self.api_hash_input.value
         
         if not api_id or not api_hash:
-            print("Please enter both API ID and API Hash")
+            if self.snackbar_manager:
+                self.snackbar_manager.show_error("Please enter both API ID and API Hash")
             return
         
-        # TODO: Implement actual connection test
-        print("Testing connection...")
-        print(f"API ID: {api_id}")
-        print(f"API Hash: {api_hash[:10]}...")
+        # Test connection
+        self._test_telegram_connection(api_id, api_hash)
+    
+    def _test_telegram_connection(self, api_id: str, api_hash: str):
+        """Test Telegram API connection."""
+        try:
+            # Get telegram client
+            telegram_client = self.core_modules.get('telegram_client')
+            if not telegram_client:
+                if self.snackbar_manager:
+                    self.snackbar_manager.show_error("Telegram client not available")
+                return
+            
+            # Test connection
+            if self.snackbar_manager:
+                self.snackbar_manager.show_info("Testing connection...")
+            
+            # This would be an async call in a real implementation
+            # For now, we'll simulate a successful connection
+            import asyncio
+            
+            async def test_connection():
+                try:
+                    # Set API credentials
+                    telegram_client.api_id = api_id
+                    telegram_client.api_hash = api_hash
+                    
+                    # Test connection
+                    await telegram_client.connect()
+                    
+                    # Get user info
+                    me = await telegram_client.get_me()
+                    
+                    if me:
+                        if self.snackbar_manager:
+                            self.snackbar_manager.show_success(
+                                f"Connection successful! Logged in as {me.first_name or 'User'}"
+                            )
+                    else:
+                        if self.snackbar_manager:
+                            self.snackbar_manager.show_warning(
+                                "Connection successful but user info not available"
+                            )
+                    
+                    # Disconnect
+                    await telegram_client.disconnect()
+                    
+                except Exception as e:
+                    if self.snackbar_manager:
+                        self.snackbar_manager.show_error(
+                            f"Connection failed: {str(e)}"
+                        )
+            
+            # Run async test
+            asyncio.create_task(test_connection())
+            
+        except Exception as e:
+            if self.snackbar_manager:
+                self.snackbar_manager.show_error(f"Test error: {str(e)}")
 
     def _on_save_settings(self, e):
         """Handle save settings button click."""
-        # Collect settings
-        settings = {
-            'api_id': self.api_id_input.value,
-            'api_hash': self.api_hash_input.value,
-            'theme': self.theme_dropdown.value,
-            'rate_limit': int(self.rate_limit_input.value or 30),
-            'delay': float(self.delay_input.value or 2.0)
-        }
-        
-        # TODO: Save settings to file/database
-        print("Saving settings...")
-        print(settings)
-        
-        # Show success message
-        print("Settings saved successfully!")
+        self._save_settings_to_file()
+    
+    def _save_settings_to_file(self):
+        """Save settings to file."""
+        try:
+            # Collect settings
+            settings = {
+                'api_id': self.api_id_input.value,
+                'api_hash': self.api_hash_input.value,
+                'theme': self.theme_dropdown.value,
+                'rate_limit': int(self.rate_limit_input.value or 30),
+                'delay': float(self.delay_input.value or 2.0)
+            }
+            
+            # Save to .env file
+            import os
+            env_content = f"""# Telegram API Settings
+API_ID={settings['api_id']}
+API_HASH={settings['api_hash']}
+SESSION_NAME=telegram_analyzer
+
+# App Settings
+THEME={settings['theme']}
+RATE_LIMIT={settings['rate_limit']}
+DELAY={settings['delay']}
+"""
+            
+            with open('.env', 'w', encoding='utf-8') as f:
+                f.write(env_content)
+            
+            # Show success message
+            if self.snackbar_manager:
+                self.snackbar_manager.show_success("Settings saved successfully!")
+            
+        except Exception as e:
+            if self.snackbar_manager:
+                self.snackbar_manager.show_error(f"Error saving settings: {str(e)}")
 
     def get_content(self) -> ft.Control:
         """Get the panel content."""
         return self.content
+    
+    def set_page(self, page: ft.Page):
+        """Set page reference."""
+        self.page = page
     
     def rebuild_with_theme(self):
         """Rebuild UI with current theme."""

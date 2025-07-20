@@ -30,7 +30,7 @@ class MainWindow:
     - Sidebar and content area
     """
 
-    def __init__(self, page: ft.Page, core_modules: dict = None, theme_manager: ThemeManager = None):
+    def __init__(self, page: ft.Page, core_modules: dict = None, theme_manager: ThemeManager = None, snackbar_manager = None):
         """
         Initialize the main window.
 
@@ -38,10 +38,12 @@ class MainWindow:
             page: Flet page instance
             core_modules: Core modules dictionary
             theme_manager: Theme manager instance
+            snackbar_manager: Snackbar manager instance
         """
         self.page = page
         self.core_modules = core_modules or {}
         self.theme_manager = theme_manager or ThemeManager()
+        self.snackbar_manager = snackbar_manager
         self.current_panel = "contacts"
         self.page_width = 1200
         self.page_height = 800
@@ -62,11 +64,19 @@ class MainWindow:
     def _setup_panels(self):
         """Initialize application panels."""
         self.panels = {
-            "contacts": ContactPanel(self.theme_manager, self.core_modules),
-            "generator": NumberGeneratorPanel(self.theme_manager, self.core_modules),
-            "checker": NumberCheckerPanel(self.theme_manager, self.core_modules),
-            "settings": SettingsPanel(self.theme_manager, self.core_modules)
+            "contacts": ContactPanel(self.theme_manager, self.core_modules, self.snackbar_manager),
+            "generator": NumberGeneratorPanel(self.theme_manager, self.core_modules, self.snackbar_manager),
+            "checker": NumberCheckerPanel(self.theme_manager, self.core_modules, self.snackbar_manager),
+            "settings": SettingsPanel(self.theme_manager, self.core_modules, self.snackbar_manager)
         }
+        
+        # Set page reference for all panels
+        for panel in self.panels.values():
+            if hasattr(panel, 'set_page'):
+                panel.set_page(self.page)
+        
+        # Add overlays to page
+        self._add_overlays_to_page()
 
     def _setup_page(self):
         """Setup page properties."""
@@ -402,15 +412,30 @@ class MainWindow:
         """Handle page disconnect."""
         self.status_indicator.update_status("disconnected")
 
-    def show_toast(self, message: str, duration: int = 3000):
-        """Show toast notification."""
-        toast = ft.SnackBar(
-            content=ft.Text(message),
-            duration=duration,
-            bgcolor="#111827",  # Grey 900
-            action="OK"
-        )
-        self.page.show_snack_bar(toast)
+    def show_snackbar(self, message: str, duration: int = 3000):
+        """Show snackbar notification."""
+        if self.snackbar_manager:
+            self.snackbar_manager.show_info(message)
+        else:
+            snackbar = ft.SnackBar(
+                content=ft.Text(message),
+                duration=duration,
+                bgcolor="#111827",  # Grey 900
+                action="OK"
+            )
+            self.page.snack_bar = snackbar
+            self.page.update()
+    
+    def _add_overlays_to_page(self):
+        """Add overlays (FilePicker, etc.) to page."""
+        try:
+            # Add FilePicker from number checker panel
+            number_checker = self.panels.get("checker")
+            if number_checker and hasattr(number_checker, 'file_picker'):
+                if number_checker.file_picker not in self.page.overlay:
+                    self.page.overlay.append(number_checker.file_picker)
+        except Exception as e:
+            print(f"Error adding overlays: {e}")
 
     def show_modal(self, title: str, content: ft.Control, actions: Optional[list] = None):
         """Show modal dialog."""

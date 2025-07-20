@@ -31,6 +31,35 @@ class ThemeManager:
         """Initialize the theme manager."""
         self.current_mode = ThemeMode.AUTO
         self._setup_themes()
+        # Set initial theme
+        self.current_theme = self.light_theme
+        # Auto-detect system theme
+        self._detect_system_theme()
+    
+    def _detect_system_theme(self):
+        """Detect system theme and set accordingly."""
+        try:
+            import platform
+            if platform.system() == "Windows":
+                # For Windows, default to dark mode
+                self.current_mode = ThemeMode.DARK
+                # Apply dark theme immediately
+                self._apply_current_theme()
+            else:
+                # For other systems, default to light
+                self.current_mode = ThemeMode.LIGHT
+        except:
+            # Fallback to light mode
+            self.current_mode = ThemeMode.LIGHT
+    
+    def _apply_current_theme(self):
+        """Apply current theme immediately."""
+        if self.current_mode == ThemeMode.DARK:
+            # Apply dark theme colors
+            self.current_theme = self.dark_theme
+        else:
+            # Apply light theme colors
+            self.current_theme = self.light_theme
     
     def _setup_themes(self):
         """Setup theme configurations."""
@@ -218,6 +247,7 @@ class ThemeManager:
             mode: Theme mode to set
         """
         self.current_mode = mode
+        self._apply_current_theme()
     
     def set_theme(self, mode: ThemeMode) -> None:
         """

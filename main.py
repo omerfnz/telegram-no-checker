@@ -24,10 +24,12 @@ from core.file_handler import FileHandler
 from core.contact_manager import ContactManager
 from core.number_generator import NumberGenerator
 from core.anti_robot_driver import AntiRobotDriver, RateLimitConfig
+from core.exception_handler import exception_handler, handle_exception, async_handle_exception
 
 # UI modüller
 from ui.main_window import MainWindow
 from ui.theme_manager import ThemeManager
+from ui.widgets.snackbar_widget import SnackbarManager, SnackbarType
 
 # Logging konfigürasyonu
 logging.basicConfig(
@@ -52,6 +54,7 @@ class TelegramAnalyzerApp:
         self.core_modules = {}
         self.ui_window = None
         self.theme_manager = None
+        self.snackbar_manager = None
         
         # Core modüllerini başlat
         self._init_core_modules()
@@ -86,7 +89,20 @@ class TelegramAnalyzerApp:
             
         except Exception as e:
             logger.error(f"Core modüller başlatma hatası: {e}")
+            exception_handler.handle_exception(e, "_init_core_modules")
             raise
+    
+    def _show_snackbar(self, message: str, snackbar_type, title: str, duration: int):
+        """Show snackbar notification."""
+        if self.snackbar_manager:
+            if snackbar_type.value == "success":
+                self.snackbar_manager.show_success(message)
+            elif snackbar_type.value == "error":
+                self.snackbar_manager.show_error(message)
+            elif snackbar_type.value == "warning":
+                self.snackbar_manager.show_warning(message)
+            else:
+                self.snackbar_manager.show_info(message)
     
     def create_main_window(self, page: ft.Page):
         """
@@ -96,16 +112,25 @@ class TelegramAnalyzerApp:
             page (ft.Page): Flet sayfa nesnesi
         """
         try:
+            # Snackbar manager'ı başlat
+            self.snackbar_manager = SnackbarManager(page)
+            
+            # Exception handler'ı yapılandır
+            exception_handler.set_page(page)
+            exception_handler.set_snackbar_callback(self._show_snackbar)
+            
             self.ui_window = MainWindow(
                 page=page,
                 core_modules=self.core_modules,
-                theme_manager=self.theme_manager
+                theme_manager=self.theme_manager,
+                snackbar_manager=self.snackbar_manager
             )
             
             logger.info("Ana pencere oluşturuldu")
             
         except Exception as e:
             logger.error(f"Ana pencere oluşturma hatası: {e}")
+            exception_handler.handle_exception(e, "create_main_window")
             raise
     
     def run(self):

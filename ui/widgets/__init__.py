@@ -1,7 +1,7 @@
 """
-Modern UI widgets for Telegram Analyzer Tool.
+UI Widgets Module.
 
-This module contains custom widgets with modern design and responsive behavior.
+This module contains all custom UI widgets and components.
 """
 
 from .modern_components import (
@@ -17,7 +17,6 @@ from .modern_components import (
     ModernSidebar,
     ModernNavigation,
     ModernModal,
-    ModernToast,
     ModernBadge,
     ModernAvatar,
     ModernDivider,
@@ -25,16 +24,21 @@ from .modern_components import (
 )
 
 from .specialized_widgets import (
+    StatusIndicator,
+    NumberRangeInput,
     FastFilter,
     ProgressBar,
-    NumberRangeInput,
     FileUploader,
     CountrySelector,
     OperatorSelector,
     PatternInput,
     SessionCard,
-    StatisticsCard,
-    StatusIndicator
+    StatisticsCard
+)
+
+from .snackbar_widget import (
+    SnackbarManager,
+    SnackbarType
 )
 
 __all__ = [
@@ -51,21 +55,24 @@ __all__ = [
     'ModernSidebar',
     'ModernNavigation',
     'ModernModal',
-    'ModernToast',
     'ModernBadge',
     'ModernAvatar',
     'ModernDivider',
     'ModernSpacer',
     
     # Specialized Widgets
+    'StatusIndicator',
+    'NumberRangeInput',
     'FastFilter',
     'ProgressBar',
-    'NumberRangeInput',
     'FileUploader',
     'CountrySelector',
     'OperatorSelector',
     'PatternInput',
     'SessionCard',
     'StatisticsCard',
-    'StatusIndicator'
+    
+    # Snackbar System
+    'SnackbarManager',
+    'SnackbarType'
 ] 

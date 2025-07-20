@@ -1,0 +1,1 @@
+# ViewModels package - Business logic and UI state management
